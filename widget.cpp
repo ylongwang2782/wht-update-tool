@@ -455,7 +455,7 @@ void Widget::initializeLogging()
         logStream->setDevice(logFile);
         // Qt6中不再需要setCodec，默认使用UTF-8
         
-        appendLog("=== MCU固件升级工具启动 ===");
+        appendLog("=== wht_upgrade_tool启动 ===");
         appendLog(QString("日志文件: %1").arg(logFileName));
     }
 }

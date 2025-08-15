@@ -1,0 +1,32 @@
+{
+    "version": 3,
+    "configurePresets": [
+      {
+        "name": "release",
+        "description": "Release build",
+        "hidden": false,
+        "generator": "Ninja",
+        "binaryDir": "${sourceDir}/build/release",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Release",
+          "CMAKE_PREFIX_PATH": "C:/Qt/6.9.1/mingw_64",
+          "CMAKE_C_COMPILER": "C:/Qt/Tools/mingw1310_64/bin/gcc.exe",
+          "CMAKE_CXX_COMPILER": "C:/Qt/Tools/mingw1310_64/bin/g++.exe"
+        }
+      },
+      {
+        "name": "debug",
+        "description": "Debug build",
+        "hidden": false,
+        "generator": "Ninja",
+        "binaryDir": "${sourceDir}/build/debug",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Debug",
+          "CMAKE_PREFIX_PATH": "C:/Qt/6.9.1/mingw_64",
+          "CMAKE_C_COMPILER": "C:/Qt/Tools/mingw1310_64/bin/gcc.exe",
+          "CMAKE_CXX_COMPILER": "C:/Qt/Tools/mingw1310_64/bin/g++.exe"
+        }
+      }
+    ]
+  }
+  

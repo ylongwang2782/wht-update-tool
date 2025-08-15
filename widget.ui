@@ -23,7 +23,7 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>MCU固件升级工具</string>
+   <string>wht_upgrade_tool</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_3">
    <item>

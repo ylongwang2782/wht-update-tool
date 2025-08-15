@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug SerialPortYmodem",
+            "name": "Debug wht_upgrade_tool",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/SerialPortYmodem.exe",
+            "program": "${workspaceFolder}/build/release/wht_upgrade_tool.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
