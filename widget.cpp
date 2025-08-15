@@ -12,7 +12,9 @@ Widget::Widget(QWidget *parent) :
     ui(new Ui::Widget),
     serialPort(new QSerialPort),
     ymodemFileTransmit(new YmodemFileTransmit),
-    bootloaderWaitTimer(new QTimer)
+    bootloaderWaitTimer(new QTimer),
+    logFile(new QFile),
+    logStream(new QTextStream)
 {
     transmitButtonStatus = false;
     waitingForBootloader = false;
@@ -41,14 +43,25 @@ Widget::Widget(QWidget *parent) :
     // 设置bootloader等待超时时间为10秒
     bootloaderWaitTimer->setSingleShot(true);
     bootloaderWaitTimer->setInterval(10000);
+    
+    // 初始化日志系统
+    initializeLogging();
 }
 
 Widget::~Widget()
 {
+    // 关闭日志文件
+    if(logFile && logFile->isOpen())
+    {
+        logFile->close();
+    }
+    
     delete ui;
     delete serialPort;
     delete ymodemFileTransmit;
     delete bootloaderWaitTimer;
+    delete logStream;
+    delete logFile;
 }
 
 void Widget::on_comButton_clicked()
@@ -63,6 +76,7 @@ void Widget::on_comButton_clicked()
         if(serialPort->open(QSerialPort::ReadWrite) == true)
         {
             button_status = true;
+            appendLog(QString("串口打开成功: %1 - %2").arg(ui->comPort->currentText(), ui->comBaudRate->currentText()));
 
             ui->comPort->setDisabled(true);
             ui->comBaudRate->setDisabled(true);
@@ -77,12 +91,14 @@ void Widget::on_comButton_clicked()
         }
         else
         {
+            appendLog(QString("串口打开失败: %1").arg(ui->comPort->currentText()));
             QMessageBox::warning(this, u8"串口打开失败", u8"请检查串口是否已被占用！", u8"关闭");
         }
     }
     else
     {
         button_status = false;
+        appendLog("串口关闭");
 
         serialPort->close();
 
@@ -97,10 +113,12 @@ void Widget::on_comButton_clicked()
 
 void Widget::on_transmitBrowse_clicked()
 {
-    ui->transmitPath->setText(QFileDialog::getOpenFileName(this, u8"选择固件文件", ".", u8"固件文件 (*.bin *.hex *.*)"));
+    QString fileName = QFileDialog::getOpenFileName(this, u8"选择固件文件", ".", u8"固件文件 (*.bin *.hex *.*)");
+    ui->transmitPath->setText(fileName);
 
     if(ui->transmitPath->text().isEmpty() != true)
     {
+        appendLog(QString("选择固件文件: %1").arg(fileName));
         ui->transmitButton->setEnabled(true);
     }
     else
@@ -109,21 +127,19 @@ void Widget::on_transmitBrowse_clicked()
     }
 }
 
-void Widget::on_clearLogButton_clicked()
-{
-    ui->debugLog->clear();
-}
+
 
 void Widget::appendLog(const QString &message)
 {
-    QDateTime currentTime = QDateTime::currentDateTime();
-    QString timeStr = currentTime.toString("hh:mm:ss.zzz");
-    ui->debugLog->append(QString("[%1] %2").arg(timeStr, message));
-    
-    // 自动滚动到底部
-    QTextCursor cursor = ui->debugLog->textCursor();
-    cursor.movePosition(QTextCursor::End);
-    ui->debugLog->setTextCursor(cursor);
+    // 只写入文件，不在界面显示
+    if(logStream && logFile && logFile->isOpen())
+    {
+        QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz");
+        QString logEntry = QString("[%1] %2").arg(timestamp, message);
+        
+        *logStream << logEntry << Qt::endl;
+        logStream->flush(); // 立即写入文件
+    }
 }
 
 void Widget::on_transmitButton_clicked()
@@ -140,6 +156,7 @@ void Widget::on_transmitButton_clicked()
         }
         
         // 开始升级流程：先发送upgrade命令
+        appendLog("=== 开始固件升级流程 ===");
         transmitButtonStatus = true;
         ui->comButton->setDisabled(true);
         ui->transmitBrowse->setDisabled(true);
@@ -151,6 +168,7 @@ void Widget::on_transmitButton_clicked()
     else
     {
         // 取消升级
+        appendLog("用户取消升级操作");
         if(waitingForBootloader)
         {
             bootloaderWaitTimer->stop();
@@ -193,6 +211,7 @@ void Widget::transmitStatus(Ymodem::Status status)
 
         case YmodemFileTransmit::StatusFinish:
         {
+            appendLog("=== 固件升级完成 ===");
             transmitButtonStatus = false;
 
             ui->comButton->setEnabled(true);
@@ -207,6 +226,7 @@ void Widget::transmitStatus(Ymodem::Status status)
 
         case YmodemFileTransmit::StatusAbort:
         {
+            appendLog("固件升级被中止");
             transmitButtonStatus = false;
 
             ui->comButton->setEnabled(true);
@@ -221,6 +241,7 @@ void Widget::transmitStatus(Ymodem::Status status)
 
         case YmodemFileTransmit::StatusTimeout:
         {
+            appendLog("固件升级超时");
             transmitButtonStatus = false;
 
             ui->comButton->setEnabled(true);
@@ -235,6 +256,7 @@ void Widget::transmitStatus(Ymodem::Status status)
 
         default:
         {
+            appendLog("固件升级遇到未知错误");
             transmitButtonStatus = false;
 
             ui->comButton->setEnabled(true);
@@ -284,7 +306,7 @@ void Widget::sendUpgradeCommandSlow()
 {
     // 使用逐字符慢速发送模式
     QByteArray upgradeCommand = "upgrade\r\n";
-    appendLog(QString("发送upgrade命令: %1 (十六进制: %2)").arg(QString(upgradeCommand)).arg(QString(upgradeCommand.toHex(' '))));
+    // appendLog(QString("发送upgrade命令: %1 (十六进制: %2)").arg(QString(upgradeCommand)).arg(QString(upgradeCommand.toHex(' '))));
     appendLog("使用慢速逐字符发送模式（每字符间隔10ms）...");
     
     qint64 totalBytesWritten = 0;
@@ -331,39 +353,6 @@ void Widget::sendUpgradeCommandSlow()
     });
 }
 
-void Widget::sendUpgradeCommandFast()
-{
-    // 使用正常速度发送（如果慢速发送也不行，可以尝试这个）
-    QByteArray upgradeCommand = "upgrade\r\n";
-    appendLog(QString("发送upgrade命令: %1 (十六进制: %2)").arg(QString(upgradeCommand)).arg(QString(upgradeCommand.toHex(' '))));
-    appendLog("使用正常速度发送模式...");
-    
-    qint64 bytesWritten = serialPort->write(upgradeCommand);
-    if(bytesWritten == -1)
-    {
-        appendLog("错误: 发送upgrade命令失败！");
-        return;
-    }
-    
-    bool writeSuccess = serialPort->waitForBytesWritten(3000);
-    if(!writeSuccess)
-    {
-        appendLog("警告: 等待数据写入超时");
-    }
-    else
-    {
-        appendLog(QString("快速发送完成，总共发送 %1 字节").arg(bytesWritten));
-    }
-    
-    // 短暂等待让MCU处理命令
-    QTimer::singleShot(1000, [this]() {
-        waitingForBootloader = true;
-        bootloaderWaitTimer->start();
-        appendLog("等待MCU进入bootloader模式...");
-        ui->transmitButton->setText(u8"等待MCU进入升级模式...");
-    });
-}
-
 void Widget::onWaitForBootloaderTimeout()
 {
     bootloaderWaitTimer->stop();
@@ -389,7 +378,7 @@ void Widget::onSerialDataReceived()
         // 记录所有接收到的数据
         QString receivedText = QString::fromUtf8(data);
         QString hexData = data.toHex(' ');
-        appendLog(QString("接收到数据: \"%1\" (十六进制: %2)").arg(receivedText).arg(hexData));
+        // appendLog(QString("接收到数据: \"%1\" (十六进制: %2)").arg(receivedText).arg(hexData));
         
         if(waitingForBootloader)
         {
@@ -450,6 +439,24 @@ void Widget::startFirmwareTransmission()
         ui->transmitBrowse->setEnabled(true);
         ui->transmitButton->setText(u8"开始升级");
         QMessageBox::warning(this, u8"失败", u8"固件升级失败！", u8"关闭");
+    }
+}
+
+void Widget::initializeLogging()
+{
+    // 创建日志文件名（包含时间戳）
+    QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
+    QString logFileName = QString("upgrade_log_%1.txt").arg(timestamp);
+    
+    logFile->setFileName(logFileName);
+    
+    if(logFile->open(QIODevice::WriteOnly | QIODevice::Append))
+    {
+        logStream->setDevice(logFile);
+        // Qt6中不再需要setCodec，默认使用UTF-8
+        
+        appendLog("=== MCU固件升级工具启动 ===");
+        appendLog(QString("日志文件: %1").arg(logFileName));
     }
 }
 

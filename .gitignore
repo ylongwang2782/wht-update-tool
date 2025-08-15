@@ -4,3 +4,4 @@
 /SerialPortYmodem/SerialPortYmodem.pro.user
 build/
 .cache/
+upgrade_log_*.txt

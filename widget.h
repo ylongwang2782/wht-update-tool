@@ -4,6 +4,9 @@
 #include <QWidget>
 #include <QSerialPort>
 #include <QTimer>
+#include <QTextStream>
+#include <QFile>
+#include <QDateTime>
 #include "YmodemFileTransmit.h"
 
 
@@ -23,7 +26,6 @@ private slots:
     void on_comButton_clicked();
     void on_transmitBrowse_clicked();
     void on_transmitButton_clicked();
-    void on_clearLogButton_clicked();
     void transmitProgress(int progress);
     void transmitStatus(YmodemFileTransmit::Status status);
     void onWaitForBootloaderTimeout();
@@ -34,15 +36,17 @@ private:
     QSerialPort *serialPort;
     YmodemFileTransmit *ymodemFileTransmit;
     QTimer *bootloaderWaitTimer;
+    QFile *logFile;
+    QTextStream *logStream;
 
     bool transmitButtonStatus;
     bool waitingForBootloader;
     
     void sendUpgradeCommand();
     void sendUpgradeCommandSlow();
-    void sendUpgradeCommandFast();
     void startFirmwareTransmission();
     void appendLog(const QString &message);
+    void initializeLogging();
 };
 
 #endif // WIDGET_H
