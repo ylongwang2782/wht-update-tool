@@ -19,11 +19,9 @@ add_executable(${PROJECT_NAME}
     main.cpp
     widget.cpp
     Ymodem.cpp
-    YmodemFileReceive.cpp
     YmodemFileTransmit.cpp
     widget.h
     Ymodem.h
-    YmodemFileReceive.h
     YmodemFileTransmit.h
     widget.ui
     SerialPortYmodem.ico

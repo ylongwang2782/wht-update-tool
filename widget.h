@@ -2,8 +2,10 @@
 #define WIDGET_H
 
 #include <QWidget>
+#include <QSerialPort>
+#include <QTimer>
 #include "YmodemFileTransmit.h"
-#include "YmodemFileReceive.h"
+
 
 namespace Ui {
 class Widget;
@@ -20,22 +22,27 @@ public:
 private slots:
     void on_comButton_clicked();
     void on_transmitBrowse_clicked();
-    void on_receiveBrowse_clicked();
     void on_transmitButton_clicked();
-    void on_receiveButton_clicked();
+    void on_clearLogButton_clicked();
     void transmitProgress(int progress);
-    void receiveProgress(int progress);
     void transmitStatus(YmodemFileTransmit::Status status);
-    void receiveStatus(YmodemFileReceive::Status status);
+    void onWaitForBootloaderTimeout();
+    void onSerialDataReceived();
 
 private:
     Ui::Widget *ui;
     QSerialPort *serialPort;
     YmodemFileTransmit *ymodemFileTransmit;
-    YmodemFileReceive *ymodemFileReceive;
+    QTimer *bootloaderWaitTimer;
 
     bool transmitButtonStatus;
-    bool receiveButtonStatus;
+    bool waitingForBootloader;
+    
+    void sendUpgradeCommand();
+    void sendUpgradeCommandSlow();
+    void sendUpgradeCommandFast();
+    void startFirmwareTransmission();
+    void appendLog(const QString &message);
 };
 
 #endif // WIDGET_H

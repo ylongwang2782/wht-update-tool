@@ -3,16 +3,19 @@
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QSerialPortInfo>
+#include <QDateTime>
+#include <QTextCursor>
+#include <QThread>
 
 Widget::Widget(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::Widget),
     serialPort(new QSerialPort),
     ymodemFileTransmit(new YmodemFileTransmit),
-    ymodemFileReceive(new YmodemFileReceive)
+    bootloaderWaitTimer(new QTimer)
 {
     transmitButtonStatus = false;
-    receiveButtonStatus  = false;
+    waitingForBootloader = false;
 
     ui->setupUi(this);
 
@@ -31,9 +34,13 @@ Widget::Widget(QWidget *parent) :
     serialPort->setFlowControl(QSerialPort::NoFlowControl);
 
     connect(ymodemFileTransmit, SIGNAL(transmitProgress(int)), this, SLOT(transmitProgress(int)));
-    connect(ymodemFileReceive, SIGNAL(receiveProgress(int)), this, SLOT(receiveProgress(int)));
     connect(ymodemFileTransmit, SIGNAL(transmitStatus(YmodemFileTransmit::Status)), this, SLOT(transmitStatus(YmodemFileTransmit::Status)));
-    connect(ymodemFileReceive, SIGNAL(receiveStatus(YmodemFileReceive::Status)), this, SLOT(receiveStatus(YmodemFileReceive::Status)));
+    connect(bootloaderWaitTimer, SIGNAL(timeout()), this, SLOT(onWaitForBootloaderTimeout()));
+    connect(serialPort, SIGNAL(readyRead()), this, SLOT(onSerialDataReceived()));
+    
+    // 设置bootloader等待超时时间为10秒
+    bootloaderWaitTimer->setSingleShot(true);
+    bootloaderWaitTimer->setInterval(10000);
 }
 
 Widget::~Widget()
@@ -41,7 +48,7 @@ Widget::~Widget()
     delete ui;
     delete serialPort;
     delete ymodemFileTransmit;
-    delete ymodemFileReceive;
+    delete bootloaderWaitTimer;
 }
 
 void Widget::on_comButton_clicked()
@@ -62,16 +69,10 @@ void Widget::on_comButton_clicked()
             ui->comButton->setText(u8"关闭串口");
 
             ui->transmitBrowse->setEnabled(true);
-            ui->receiveBrowse->setEnabled(true);
 
             if(ui->transmitPath->text().isEmpty() != true)
             {
                 ui->transmitButton->setEnabled(true);
-            }
-
-            if(ui->receivePath->text().isEmpty() != true)
-            {
-                ui->receiveButton->setEnabled(true);
             }
         }
         else
@@ -91,15 +92,12 @@ void Widget::on_comButton_clicked()
 
         ui->transmitBrowse->setDisabled(true);
         ui->transmitButton->setDisabled(true);
-
-        ui->receiveBrowse->setDisabled(true);
-        ui->receiveButton->setDisabled(true);
     }
 }
 
 void Widget::on_transmitBrowse_clicked()
 {
-    ui->transmitPath->setText(QFileDialog::getOpenFileName(this, u8"打开文件", ".", u8"任意文件 (*.*)"));
+    ui->transmitPath->setText(QFileDialog::getOpenFileName(this, u8"选择固件文件", ".", u8"固件文件 (*.bin *.hex *.*)"));
 
     if(ui->transmitPath->text().isEmpty() != true)
     {
@@ -111,97 +109,73 @@ void Widget::on_transmitBrowse_clicked()
     }
 }
 
-void Widget::on_receiveBrowse_clicked()
+void Widget::on_clearLogButton_clicked()
 {
-    ui->receivePath->setText(QFileDialog::getExistingDirectory(this, u8"选择目录", ".", QFileDialog::ShowDirsOnly));
+    ui->debugLog->clear();
+}
 
-    if(ui->receivePath->text().isEmpty() != true)
-    {
-        ui->receiveButton->setEnabled(true);
-    }
-    else
-    {
-        ui->receiveButton->setDisabled(true);
-    }
+void Widget::appendLog(const QString &message)
+{
+    QDateTime currentTime = QDateTime::currentDateTime();
+    QString timeStr = currentTime.toString("hh:mm:ss.zzz");
+    ui->debugLog->append(QString("[%1] %2").arg(timeStr, message));
+    
+    // 自动滚动到底部
+    QTextCursor cursor = ui->debugLog->textCursor();
+    cursor.movePosition(QTextCursor::End);
+    ui->debugLog->setTextCursor(cursor);
 }
 
 void Widget::on_transmitButton_clicked()
 {
     if(transmitButtonStatus == false)
     {
-        serialPort->close();
-
-        ymodemFileTransmit->setFileName(ui->transmitPath->text());
-        ymodemFileTransmit->setPortName(ui->comPort->currentText());
-        ymodemFileTransmit->setPortBaudRate(ui->comBaudRate->currentText().toInt());
-
-        if(ymodemFileTransmit->startTransmit() == true)
+        if(waitingForBootloader)
         {
-            transmitButtonStatus = true;
-
-            ui->comButton->setDisabled(true);
-
-            ui->receiveBrowse->setDisabled(true);
-            ui->receiveButton->setDisabled(true);
-
-            ui->transmitBrowse->setDisabled(true);
-            ui->transmitButton->setText(u8"取消");
-            ui->transmitProgress->setValue(0);
+            // 取消等待bootloader
+            bootloaderWaitTimer->stop();
+            waitingForBootloader = false;
+            ui->transmitButton->setText(u8"开始升级");
+            return;
         }
-        else
-        {
-            QMessageBox::warning(this, u8"失败", u8"文件发送失败！", u8"关闭");
-        }
+        
+        // 开始升级流程：先发送upgrade命令
+        transmitButtonStatus = true;
+        ui->comButton->setDisabled(true);
+        ui->transmitBrowse->setDisabled(true);
+        ui->transmitButton->setText(u8"取消升级");
+        ui->transmitProgress->setValue(0);
+        
+        sendUpgradeCommand();
     }
     else
     {
-        ymodemFileTransmit->stopTransmit();
-    }
-}
-
-void Widget::on_receiveButton_clicked()
-{
-    if(receiveButtonStatus == false)
-    {
-        serialPort->close();
-
-        ymodemFileReceive->setFilePath(ui->receivePath->text());
-        ymodemFileReceive->setPortName(ui->comPort->currentText());
-        ymodemFileReceive->setPortBaudRate(ui->comBaudRate->currentText().toInt());
-
-        if(ymodemFileReceive->startReceive() == true)
+        // 取消升级
+        if(waitingForBootloader)
         {
-            receiveButtonStatus = true;
-
-            ui->comButton->setDisabled(true);
-
-            ui->transmitBrowse->setDisabled(true);
-            ui->transmitButton->setDisabled(true);
-
-            ui->receiveBrowse->setDisabled(true);
-            ui->receiveButton->setText(u8"取消");
-            ui->receiveProgress->setValue(0);
+            bootloaderWaitTimer->stop();
+            waitingForBootloader = false;
         }
         else
         {
-            QMessageBox::warning(this, u8"失败", u8"文件接收失败！", u8"关闭");
+            ymodemFileTransmit->stopTransmit();
         }
-    }
-    else
-    {
-        ymodemFileReceive->stopReceive();
+        
+        transmitButtonStatus = false;
+        ui->comButton->setEnabled(true);
+        ui->transmitBrowse->setEnabled(true);
+        ui->transmitButton->setText(u8"开始升级");
     }
 }
+
+
 
 void Widget::transmitProgress(int progress)
 {
     ui->transmitProgress->setValue(progress);
 }
 
-void Widget::receiveProgress(int progress)
-{
-    ui->receiveProgress->setValue(progress);
-}
+
 
 void Widget::transmitStatus(Ymodem::Status status)
 {
@@ -223,17 +197,10 @@ void Widget::transmitStatus(Ymodem::Status status)
 
             ui->comButton->setEnabled(true);
 
-            ui->receiveBrowse->setEnabled(true);
-
-            if(ui->receivePath->text().isEmpty() != true)
-            {
-                ui->receiveButton->setEnabled(true);
-            }
-
             ui->transmitBrowse->setEnabled(true);
-            ui->transmitButton->setText(u8"发送");
+            ui->transmitButton->setText(u8"开始升级");
 
-            QMessageBox::warning(this, u8"成功", u8"文件发送成功！", u8"关闭");
+            QMessageBox::information(this, u8"成功", u8"固件升级成功！", u8"关闭");
 
             break;
         }
@@ -244,17 +211,10 @@ void Widget::transmitStatus(Ymodem::Status status)
 
             ui->comButton->setEnabled(true);
 
-            ui->receiveBrowse->setEnabled(true);
-
-            if(ui->receivePath->text().isEmpty() != true)
-            {
-                ui->receiveButton->setEnabled(true);
-            }
-
             ui->transmitBrowse->setEnabled(true);
-            ui->transmitButton->setText(u8"发送");
+            ui->transmitButton->setText(u8"开始升级");
 
-            QMessageBox::warning(this, u8"失败", u8"文件发送失败！", u8"关闭");
+            QMessageBox::warning(this, u8"失败", u8"固件升级失败！", u8"关闭");
 
             break;
         }
@@ -265,17 +225,10 @@ void Widget::transmitStatus(Ymodem::Status status)
 
             ui->comButton->setEnabled(true);
 
-            ui->receiveBrowse->setEnabled(true);
-
-            if(ui->receivePath->text().isEmpty() != true)
-            {
-                ui->receiveButton->setEnabled(true);
-            }
-
             ui->transmitBrowse->setEnabled(true);
-            ui->transmitButton->setText(u8"发送");
+            ui->transmitButton->setText(u8"开始升级");
 
-            QMessageBox::warning(this, u8"失败", u8"文件发送失败！", u8"关闭");
+            QMessageBox::warning(this, u8"失败", u8"固件升级超时！", u8"关闭");
 
             break;
         }
@@ -286,115 +239,218 @@ void Widget::transmitStatus(Ymodem::Status status)
 
             ui->comButton->setEnabled(true);
 
-            ui->receiveBrowse->setEnabled(true);
-
-            if(ui->receivePath->text().isEmpty() != true)
-            {
-                ui->receiveButton->setEnabled(true);
-            }
-
             ui->transmitBrowse->setEnabled(true);
-            ui->transmitButton->setText(u8"发送");
+            ui->transmitButton->setText(u8"开始升级");
 
-            QMessageBox::warning(this, u8"失败", u8"文件发送失败！", u8"关闭");
+            QMessageBox::warning(this, u8"失败", u8"固件升级失败！", u8"关闭");
         }
     }
 }
 
-void Widget::receiveStatus(YmodemFileReceive::Status status)
+void Widget::sendUpgradeCommand()
 {
-    switch(status)
+    appendLog("开始升级流程...");
+    
+    // 确保串口是打开的
+    if(!serialPort->isOpen())
     {
-        case YmodemFileReceive::StatusEstablish:
+        serialPort->setPortName(ui->comPort->currentText());
+        serialPort->setBaudRate(ui->comBaudRate->currentText().toInt());
+        
+        appendLog(QString("正在打开串口: %1, 波特率: %2").arg(ui->comPort->currentText()).arg(ui->comBaudRate->currentText()));
+        
+        if(!serialPort->open(QSerialPort::ReadWrite))
         {
-            break;
-        }
-
-        case YmodemFileReceive::StatusTransmit:
-        {
-            break;
-        }
-
-        case YmodemFileReceive::StatusFinish:
-        {
-            receiveButtonStatus = false;
-
+            appendLog("错误: 无法打开串口！");
+            QMessageBox::warning(this, u8"错误", u8"无法打开串口！", u8"关闭");
+            transmitButtonStatus = false;
             ui->comButton->setEnabled(true);
-
             ui->transmitBrowse->setEnabled(true);
-
-            if(ui->transmitPath->text().isEmpty() != true)
-            {
-                ui->transmitButton->setEnabled(true);
-            }
-
-            ui->receiveBrowse->setEnabled(true);
-            ui->receiveButton->setText(u8"接收");
-
-            QMessageBox::warning(this, u8"成功", u8"文件接收成功！", u8"关闭");
-
-            break;
+            ui->transmitButton->setText(u8"开始升级");
+            return;
         }
+        
+        appendLog("串口打开成功");
+    }
+    
+    // 清空接收缓冲区
+    serialPort->clear();
+    
+    // 首先尝试慢速发送
+    sendUpgradeCommandSlow();
+}
 
-        case YmodemFileReceive::StatusAbort:
+void Widget::sendUpgradeCommandSlow()
+{
+    // 使用逐字符慢速发送模式
+    QByteArray upgradeCommand = "upgrade\r\n";
+    appendLog(QString("发送upgrade命令: %1 (十六进制: %2)").arg(QString(upgradeCommand)).arg(QString(upgradeCommand.toHex(' '))));
+    appendLog("使用慢速逐字符发送模式（每字符间隔10ms）...");
+    
+    qint64 totalBytesWritten = 0;
+    
+    for(int i = 0; i < upgradeCommand.size(); i++)
+    {
+        char singleChar = upgradeCommand.at(i);
+        qint64 bytesWritten = serialPort->write(&singleChar, 1);
+        
+        if(bytesWritten == 1)
         {
-            receiveButtonStatus = false;
-
-            ui->comButton->setEnabled(true);
-
-            ui->transmitBrowse->setEnabled(true);
-
-            if(ui->transmitPath->text().isEmpty() != true)
+            totalBytesWritten++;
+            serialPort->waitForBytesWritten(100); // 等待字符发送完成
+            
+            // 显示当前发送的字符（用于调试）
+            if(singleChar == '\r')
+                appendLog(QString("发送字符 %1: \\r").arg(i+1));
+            else if(singleChar == '\n')
+                appendLog(QString("发送字符 %1: \\n").arg(i+1));
+            else
+                appendLog(QString("发送字符 %1: %2").arg(i+1).arg(singleChar));
+            
+            // 在字符之间添加延时
+            if(i < upgradeCommand.size() - 1)
             {
-                ui->transmitButton->setEnabled(true);
+                QThread::msleep(10); // 10ms延时
             }
-
-            ui->receiveBrowse->setEnabled(true);
-            ui->receiveButton->setText(u8"接收");
-
-            QMessageBox::warning(this, u8"失败", u8"文件接收失败！", u8"关闭");
-
-            break;
         }
-
-        case YmodemFileReceive::StatusTimeout:
+        else
         {
-            receiveButtonStatus = false;
-
-            ui->comButton->setEnabled(true);
-
-            ui->transmitBrowse->setEnabled(true);
-
-            if(ui->transmitPath->text().isEmpty() != true)
-            {
-                ui->transmitButton->setEnabled(true);
-            }
-
-            ui->receiveBrowse->setEnabled(true);
-            ui->receiveButton->setText(u8"接收");
-
-            QMessageBox::warning(this, u8"失败", u8"文件接收失败！", u8"关闭");
-
-            break;
+            appendLog(QString("错误: 发送第%1个字符失败").arg(i+1));
+            return;
         }
+    }
+    
+    appendLog(QString("慢速发送完成，总共发送 %1 字节").arg(totalBytesWritten));
+    
+    // 短暂等待让MCU处理命令
+    QTimer::singleShot(1000, [this]() {
+        waitingForBootloader = true;
+        bootloaderWaitTimer->start();
+        appendLog("等待MCU进入bootloader模式...");
+        ui->transmitButton->setText(u8"等待MCU进入升级模式...");
+    });
+}
 
-        default:
+void Widget::sendUpgradeCommandFast()
+{
+    // 使用正常速度发送（如果慢速发送也不行，可以尝试这个）
+    QByteArray upgradeCommand = "upgrade\r\n";
+    appendLog(QString("发送upgrade命令: %1 (十六进制: %2)").arg(QString(upgradeCommand)).arg(QString(upgradeCommand.toHex(' '))));
+    appendLog("使用正常速度发送模式...");
+    
+    qint64 bytesWritten = serialPort->write(upgradeCommand);
+    if(bytesWritten == -1)
+    {
+        appendLog("错误: 发送upgrade命令失败！");
+        return;
+    }
+    
+    bool writeSuccess = serialPort->waitForBytesWritten(3000);
+    if(!writeSuccess)
+    {
+        appendLog("警告: 等待数据写入超时");
+    }
+    else
+    {
+        appendLog(QString("快速发送完成，总共发送 %1 字节").arg(bytesWritten));
+    }
+    
+    // 短暂等待让MCU处理命令
+    QTimer::singleShot(1000, [this]() {
+        waitingForBootloader = true;
+        bootloaderWaitTimer->start();
+        appendLog("等待MCU进入bootloader模式...");
+        ui->transmitButton->setText(u8"等待MCU进入升级模式...");
+    });
+}
+
+void Widget::onWaitForBootloaderTimeout()
+{
+    bootloaderWaitTimer->stop();
+    waitingForBootloader = false;
+    transmitButtonStatus = false;
+    
+    appendLog("超时: 等待MCU进入bootloader模式超时！");
+    appendLog("可能的原因: 1) MCU未连接 2) 升级命令格式不正确 3) MCU固件不支持升级命令");
+    
+    ui->comButton->setEnabled(true);
+    ui->transmitBrowse->setEnabled(true);
+    ui->transmitButton->setText(u8"开始升级");
+    
+    QMessageBox::warning(this, u8"超时", u8"等待MCU进入升级模式超时！请检查MCU连接和状态。", u8"关闭");
+}
+
+void Widget::onSerialDataReceived()
+{
+    QByteArray data = serialPort->readAll();
+    
+    if(!data.isEmpty())
+    {
+        // 记录所有接收到的数据
+        QString receivedText = QString::fromUtf8(data);
+        QString hexData = data.toHex(' ');
+        appendLog(QString("接收到数据: \"%1\" (十六进制: %2)").arg(receivedText).arg(hexData));
+        
+        if(waitingForBootloader)
         {
-            receiveButtonStatus = false;
-
-            ui->comButton->setEnabled(true);
-
-            ui->transmitBrowse->setEnabled(true);
-
-            if(ui->transmitPath->text().isEmpty() != true)
+            // 检查是否收到'C'字符，表示bootloader已准备好接收数据
+            if(data.contains('C'))
             {
-                ui->transmitButton->setEnabled(true);
+                appendLog("检测到bootloader准备信号 'C'，开始发送固件...");
+                bootloaderWaitTimer->stop();
+                waitingForBootloader = false;
+                
+                // 开始发送固件
+                startFirmwareTransmission();
             }
-
-            ui->receiveBrowse->setEnabled(true);
-            ui->receiveButton->setText(u8"接收");
-
-            QMessageBox::warning(this, u8"失败", u8"文件接收失败！", u8"关闭");
+            else
+            {
+                // 检查是否有其他响应
+                if(data.contains("OK") || data.contains("ok"))
+                {
+                    appendLog("MCU响应OK，继续等待bootloader信号...");
+                }
+                else if(data.contains("ERROR") || data.contains("error"))
+                {
+                    appendLog("MCU响应ERROR，升级命令可能不被识别");
+                }
+                else if(data.contains("upgrade") || data.contains("UPGRADE"))
+                {
+                    appendLog("MCU已确认upgrade命令，等待进入bootloader...");
+                }
+            }
         }
     }
 }
+
+void Widget::startFirmwareTransmission()
+{
+    appendLog("MCU已进入bootloader模式，开始发送固件文件...");
+    
+    // 关闭串口，让YmodemFileTransmit重新打开
+    serialPort->close();
+    appendLog("关闭调试串口，准备启动YMODEM传输");
+    
+    ymodemFileTransmit->setFileName(ui->transmitPath->text());
+    ymodemFileTransmit->setPortName(ui->comPort->currentText());
+    ymodemFileTransmit->setPortBaudRate(ui->comBaudRate->currentText().toInt());
+
+    appendLog(QString("准备发送固件文件: %1").arg(ui->transmitPath->text()));
+
+    if(ymodemFileTransmit->startTransmit() == true)
+    {
+        appendLog("YMODEM传输已启动");
+        ui->transmitButton->setText(u8"取消升级");
+    }
+    else
+    {
+        appendLog("错误: YMODEM传输启动失败！");
+        transmitButtonStatus = false;
+        ui->comButton->setEnabled(true);
+        ui->transmitBrowse->setEnabled(true);
+        ui->transmitButton->setText(u8"开始升级");
+        QMessageBox::warning(this, u8"失败", u8"固件升级失败！", u8"关闭");
+    }
+}
+
+
