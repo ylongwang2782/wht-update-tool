@@ -17,11 +17,16 @@ jobs:
       # 获取最新 git tag
       - name: Get latest git tag
         id: get_version
+        shell: bash
         run: |
-            git fetch --tags
-            TAG=$(git describe --tags --abbrev=0)
-            echo "Latest tag: $TAG"
-            echo "::set-output name=version::$TAG"
+          # 获取最新的 tag，如果没有则使用 commit hash
+          if git describe --tags --abbrev=0 2>/dev/null; then
+            VERSION=$(git describe --tags --abbrev=0)
+          else
+            VERSION=$(git rev-parse --short HEAD)
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       # 安装 Qt
       - name: Install Qt
