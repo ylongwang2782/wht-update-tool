@@ -1,0 +1,61 @@
+name: Build and Release Qt App (Windows)
+
+on:
+  workflow_dispatch:   # 手动触发
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      # 拉取代码（带完整 tag）
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 获取最新 git tag
+      - name: Get latest git tag
+        id: get_version
+        run: |
+          git fetch --tags
+          echo "VERSION=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+
+      # 安装 Qt
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.7.2'             # 你的 Qt 版本
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2019_64'
+
+      # 配置 CMake
+      - name: Configure CMake
+        run: cmake -B build -S . -DCMAKE_PREFIX_PATH="%Qt6_DIR%"
+
+      # 编译
+      - name: Build
+        run: cmake --build build --config release
+
+      # 使用 windeployqt 收集依赖
+      - name: Run windeployqt
+        run: |
+          mkdir dist
+          copy build\\release\\wht-upgrade-tool-${{ env.VERSION }}.exe dist\\
+          windeployqt dist\\wht-upgrade-tool-${{ env.VERSION }}.exe --release --no-translations
+
+      # 打包 zip
+      - name: Create zip package
+        run: |
+          powershell Compress-Archive -Path dist\\* -DestinationPath wht-upgrade-tool-${{ env.VERSION }}-win64.zip
+
+      # 上传 Release
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: "Release ${{ env.VERSION }}"
+          files: wht-upgrade-tool-${{ env.VERSION }}-win64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
