@@ -7,6 +7,7 @@
         "-DCMAKE_PREFIX_PATH=C:/Qt/6.9.1/mingw_64"
     ],
     "files.associations": {
-        "qapplication": "cpp"
+        "qapplication": "cpp",
+        "qserialport": "cpp"
     }
 }
