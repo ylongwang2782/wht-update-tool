@@ -25,11 +25,11 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v3
         with:
-          version: '6.7.2'             # 你的 Qt 版本
+          version: '6.9.1'             # 你的 Qt 版本
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2019_64'
-          modules: qtbase qtserialport qtsvg   # 注意这里用空格分隔
+          modules: 'qtserialport qtsvg'   # 移除qtbase，它是核心组件不需要单独指定
 
       # 配置 CMake
       - name: Configure CMake
