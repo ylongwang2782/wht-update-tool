@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug wht-upgrade-tool",
+            "name": "Debug wht-update-tool",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/release/wht-upgrade-tool.exe",
+            "program": "${workspaceFolder}/build/release/wht-update-tool.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

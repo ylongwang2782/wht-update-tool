@@ -42,13 +42,13 @@ jobs:
       - name: Run windeployqt
         run: |
           mkdir dist
-          copy build\\release\\wht-upgrade-tool-${{ env.VERSION }}.exe dist\\
-          windeployqt dist\\wht-upgrade-tool-${{ env.VERSION }}.exe --release --no-translations
+          copy build\\release\\wht-update-tool.exe dist\\
+          windeployqt dist\\wht-update-tool.exe --release --no-translations
 
       # 打包 zip
       - name: Create zip package
         run: |
-          powershell Compress-Archive -Path dist\\* -DestinationPath wht-upgrade-tool-${{ env.VERSION }}-win64.zip
+          powershell Compress-Archive -Path dist\\* -DestinationPath wht-update-tool-${{ env.VERSION }}-win64.zip
 
       # 上传 Release
       - name: Create Release
@@ -56,6 +56,6 @@ jobs:
         with:
           tag_name: ${{ env.VERSION }}
           name: "Release ${{ env.VERSION }}"
-          files: wht-upgrade-tool-${{ env.VERSION }}-win64.zip
+          files: wht-update-tool-${{ env.VERSION }}-win64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

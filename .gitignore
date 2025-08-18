@@ -1,7 +1,7 @@
-/build-wht-upgrade-tool-Desktop_Qt_5_7_1_MSVC2015_64bit-Debug
-/build-wht-upgrade-tool-Desktop_Qt_5_7_1_MSVC2015_64bit-Profile
-/build-wht-upgrade-tool-Desktop_Qt_5_7_1_MSVC2015_64bit-Release
-/wht-upgrade-tool/wht-upgrade-tool.pro.user
+/build-wht-update-tool-Desktop_Qt_5_7_1_MSVC2015_64bit-Debug
+/build-wht-update-tool-Desktop_Qt_5_7_1_MSVC2015_64bit-Profile
+/build-wht-update-tool-Desktop_Qt_5_7_1_MSVC2015_64bit-Release
+/wht-update-tool/wht-update-tool.pro.user
 build/
 .cache/
 upgrade_log_*.txt
