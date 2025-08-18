@@ -29,10 +29,11 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2019_64'
+          modules: qtbase,qtsvg,qtserialport  # 加上 qtserialport
 
       # 配置 CMake
       - name: Configure CMake
-        run: cmake -B build -S . -DCMAKE_PREFIX_PATH="%Qt6_DIR%"
+        run: cmake -B build -S . -DCMAKE_PREFIX_PATH="%Qt6_DIR%" -DQT_DEBUG_FIND_PACKAGE=ON
 
       # 编译
       - name: Build
