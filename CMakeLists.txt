@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(wht-upgrade-tool VERSION 1.0 LANGUAGES CXX)
+project(wht-upgrade-tool VERSION 1.0.0 LANGUAGES CXX)
+
+execute_process(
+    COMMAND git describe --tags --always
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_VERSION
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
 
 # 设置 C++ 标准
 set(CMAKE_CXX_STANDARD 17)
@@ -26,6 +33,12 @@ add_executable(${PROJECT_NAME}
     widget.ui
     wht-update-tool.ico
 )
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    OUTPUT_NAME "${PROJECT_NAME}-${GIT_VERSION}"
+)
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE APP_VERSION="${PROJECT_VERSION}")
 
 # 链接 Qt 库
 target_link_libraries(${PROJECT_NAME} PRIVATE
