@@ -49,14 +49,14 @@ jobs:
       # 打包 zip
       - name: Create zip package
         run: |
-          powershell Compress-Archive -Path dist\\* -DestinationPath wht-update-tool-${{ env.VERSION }}-win64.zip
+          powershell Compress-Archive -Path dist\\* -DestinationPath wht-update-tool-${{ steps.get_version.outputs.version }}-win64.zip
 
       # 上传 Release
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag: ${{ env.VERSION }}
-          name: "Release ${{ env.VERSION }}"
-          files: wht-update-tool-${{ env.VERSION }}-win64.zip
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: "Release ${{ steps.get_version.outputs.version }}"
+          files: wht-update-tool-${{ steps.get_version.outputs.version }}-win64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
