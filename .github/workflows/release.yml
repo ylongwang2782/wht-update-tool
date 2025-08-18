@@ -29,7 +29,7 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
-          modules: qtserialport qtsvg   
+          modules: qtserialport   
 
       # 配置 CMake
       - name: Configure CMake
