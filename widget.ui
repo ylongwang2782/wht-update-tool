@@ -23,7 +23,7 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>wht_upgrade_tool</string>
+   <string>wht-upgrade-tool</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_3">
    <item>

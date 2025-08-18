@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(wht_upgrade_tool VERSION 1.0 LANGUAGES CXX)
+project(wht-upgrade-tool VERSION 1.0 LANGUAGES CXX)
 
 # 设置 C++ 标准
 set(CMAKE_CXX_STANDARD 17)
@@ -24,7 +24,7 @@ add_executable(${PROJECT_NAME}
     Ymodem.h
     YmodemFileTransmit.h
     widget.ui
-    wht_upgrade_tool.ico
+    wht-update-tool.ico
 )
 
 # 链接 Qt 库
@@ -39,6 +39,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 if(WIN32)
     set_target_properties(${PROJECT_NAME} PROPERTIES
         WIN32_EXECUTABLE TRUE
-        ICON "${CMAKE_CURRENT_SOURCE_DIR}/wht_upgrade_tool.ico"
+        ICON "${CMAKE_CURRENT_SOURCE_DIR}/wht-upgrade-tool.ico"
     )
 endif()
