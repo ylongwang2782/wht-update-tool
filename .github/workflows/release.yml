@@ -29,7 +29,7 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2019_64'
-          modules: qtbase,qtsvg,qtserialport  # 加上 qtserialport
+          modules: qtbase qtserialport qtsvg   # 注意这里用空格分隔
 
       # 配置 CMake
       - name: Configure CMake
