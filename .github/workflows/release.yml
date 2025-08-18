@@ -55,7 +55,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.VERSION }}
+          tag: ${{ env.VERSION }}
           name: "Release ${{ env.VERSION }}"
           files: wht-update-tool-${{ env.VERSION }}-win64.zip
         env:
