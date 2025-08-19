@@ -4,10 +4,19 @@
     "cmake.buildDirectory": "${workspaceFolder}/build",
     "cmake.sourceDirectory": "${workspaceFolder}",
     "cmake.configureArgs": [
-        "-DCMAKE_PREFIX_PATH=C:/Qt/6.9.1/mingw_64"
+        "-DCMAKE_PREFIX_PATH=C:/Qt/6.9.1/mingw_64/lib/cmake"
     ],
     "files.associations": {
         "qapplication": "cpp",
-        "qserialport": "cpp"
-    }
+        "qserialport": "cpp",
+        "qwidget": "cpp"
+    },
+    "clangd.arguments": [
+        "--clang-tidy",
+        "--compile-commands-dir=./build/release",
+        "--log=verbose",
+        "--pretty",
+        "--ranking-model=heuristics",
+        "--query-driver=C:/Qt/Tools/mingw1310_64/bin/g++.exe,C:/Qt/Tools/mingw1310_64/bin/gcc.exe"
+    ],
 }
