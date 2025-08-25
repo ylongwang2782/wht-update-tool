@@ -26,6 +26,7 @@ private slots:
     void on_comButton_clicked();
     void on_transmitBrowse_clicked();
     void on_transmitButton_clicked();
+    void on_directBurnButton_clicked();
     void transmitProgress(int progress);
     void transmitStatus(YmodemFileTransmit::Status status);
     void onWaitForBootloaderTimeout();
@@ -40,11 +41,13 @@ private:
     QTextStream *logStream;
 
     bool transmitButtonStatus;
+    bool directBurnButtonStatus;
     bool waitingForBootloader;
     
     void sendUpgradeCommand();
     void sendUpgradeCommandSlow();
     void startFirmwareTransmission();
+    void startDirectFirmwareTransmission();
     void appendLog(const QString &message);
     void initializeLogging();
 };

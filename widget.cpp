@@ -18,6 +18,7 @@ Widget::Widget(QWidget *parent)
       logFile(new QFile),
       logStream(new QTextStream) {
     transmitButtonStatus = false;
+    directBurnButtonStatus = false;
     waitingForBootloader = false;
 
     ui->setupUi(this);
@@ -83,6 +84,7 @@ void Widget::on_comButton_clicked() {
 
             if (ui->transmitPath->text().isEmpty() != true) {
                 ui->transmitButton->setEnabled(true);
+                ui->directBurnButton->setEnabled(true);
             }
         } else {
             appendLog(QString("串口打开失败: %1").arg(ui->comPort->currentText()));
@@ -101,6 +103,7 @@ void Widget::on_comButton_clicked() {
 
         ui->transmitBrowse->setDisabled(true);
         ui->transmitButton->setDisabled(true);
+        ui->directBurnButton->setDisabled(true);
     }
 }
 
@@ -112,8 +115,10 @@ void Widget::on_transmitBrowse_clicked() {
     if (ui->transmitPath->text().isEmpty() != true) {
         appendLog(QString("选择固件文件: %1").arg(fileName));
         ui->transmitButton->setEnabled(true);
+        ui->directBurnButton->setEnabled(true);
     } else {
         ui->transmitButton->setDisabled(true);
+        ui->directBurnButton->setDisabled(true);
     }
 }
 
@@ -134,7 +139,7 @@ void Widget::on_transmitButton_clicked() {
             // 取消等待bootloader
             bootloaderWaitTimer->stop();
             waitingForBootloader = false;
-            ui->transmitButton->setText(u8"开始升级");
+            ui->transmitButton->setText(u8"固件上传");
             return;
         }
 
@@ -143,7 +148,7 @@ void Widget::on_transmitButton_clicked() {
         transmitButtonStatus = true;
         ui->comButton->setDisabled(true);
         ui->transmitBrowse->setDisabled(true);
-        ui->transmitButton->setText(u8"取消升级");
+        ui->transmitButton->setText(u8"取消上传");
         ui->transmitProgress->setValue(0);
 
         sendUpgradeCommand();
@@ -177,57 +182,93 @@ void Widget::transmitStatus(Ymodem::Status status) {
         }
 
         case YmodemFileTransmit::StatusFinish: {
-            appendLog("=== 固件升级完成 ===");
-            transmitButtonStatus = false;
+            if (directBurnButtonStatus) {
+                appendLog("=== 直接固件烧录完成 ===");
+                directBurnButtonStatus = false;
+                ui->directBurnButton->setText(u8"固件烧录");
+                QMessageBox::information(this, u8"成功", u8"直接固件烧录成功！", QMessageBox::Close);
+            } else {
+                appendLog("=== 固件升级完成 ===");
+                transmitButtonStatus = false;
+                ui->transmitButton->setText(u8"固件上传");
+                QMessageBox::information(this, u8"成功", u8"固件升级成功！", QMessageBox::Close);
+            }
 
             ui->comButton->setEnabled(true);
-
             ui->transmitBrowse->setEnabled(true);
-            ui->transmitButton->setText(u8"开始升级");
-
-            QMessageBox::information(this, u8"成功", u8"固件升级成功！", QMessageBox::Close);
+            if (!ui->transmitPath->text().isEmpty()) {
+                ui->transmitButton->setEnabled(true);
+                ui->directBurnButton->setEnabled(true);
+            }
 
             break;
         }
 
         case YmodemFileTransmit::StatusAbort: {
-            appendLog("固件升级被中止");
-            transmitButtonStatus = false;
+            if (directBurnButtonStatus) {
+                appendLog("直接固件烧录被中止");
+                directBurnButtonStatus = false;
+                ui->directBurnButton->setText(u8"固件烧录");
+                QMessageBox::warning(this, u8"失败", u8"直接固件烧录失败！", QMessageBox::Close);
+            } else {
+                appendLog("固件升级被中止");
+                transmitButtonStatus = false;
+                ui->transmitButton->setText(u8"固件上传");
+                QMessageBox::warning(this, u8"失败", u8"固件升级失败！", QMessageBox::Close);
+            }
 
             ui->comButton->setEnabled(true);
-
             ui->transmitBrowse->setEnabled(true);
-            ui->transmitButton->setText(u8"开始升级");
-
-            QMessageBox::warning(this, u8"失败", u8"固件升级失败！", QMessageBox::Close);
+            if (!ui->transmitPath->text().isEmpty()) {
+                ui->transmitButton->setEnabled(true);
+                ui->directBurnButton->setEnabled(true);
+            }
 
             break;
         }
 
         case YmodemFileTransmit::StatusTimeout: {
-            appendLog("固件升级超时");
-            transmitButtonStatus = false;
+            if (directBurnButtonStatus) {
+                appendLog("直接固件烧录超时");
+                directBurnButtonStatus = false;
+                ui->directBurnButton->setText(u8"固件烧录");
+                QMessageBox::warning(this, u8"失败", u8"直接固件烧录超时！", QMessageBox::Close);
+            } else {
+                appendLog("固件升级超时");
+                transmitButtonStatus = false;
+                ui->transmitButton->setText(u8"固件上传");
+                QMessageBox::warning(this, u8"失败", u8"固件升级超时！", QMessageBox::Close);
+            }
 
             ui->comButton->setEnabled(true);
-
             ui->transmitBrowse->setEnabled(true);
-            ui->transmitButton->setText(u8"开始升级");
-
-            QMessageBox::warning(this, u8"失败", u8"固件升级超时！", QMessageBox::Close);
+            if (!ui->transmitPath->text().isEmpty()) {
+                ui->transmitButton->setEnabled(true);
+                ui->directBurnButton->setEnabled(true);
+            }
 
             break;
         }
 
         default: {
-            appendLog("固件升级遇到未知错误");
-            transmitButtonStatus = false;
+            if (directBurnButtonStatus) {
+                appendLog("直接固件烧录遇到未知错误");
+                directBurnButtonStatus = false;
+                ui->directBurnButton->setText(u8"固件烧录");
+                QMessageBox::warning(this, u8"失败", u8"直接固件烧录失败！", QMessageBox::Close);
+            } else {
+                appendLog("固件升级遇到未知错误");
+                transmitButtonStatus = false;
+                ui->transmitButton->setText(u8"固件上传");
+                QMessageBox::warning(this, u8"失败", u8"固件升级失败！", QMessageBox::Close);
+            }
 
             ui->comButton->setEnabled(true);
-
             ui->transmitBrowse->setEnabled(true);
-            ui->transmitButton->setText(u8"开始升级");
-
-            QMessageBox::warning(this, u8"失败", u8"固件升级失败！", QMessageBox::Close);
+            if (!ui->transmitPath->text().isEmpty()) {
+                ui->transmitButton->setEnabled(true);
+                ui->directBurnButton->setEnabled(true);
+            }
         }
     }
 }
@@ -250,7 +291,11 @@ void Widget::sendUpgradeCommand() {
             transmitButtonStatus = false;
             ui->comButton->setEnabled(true);
             ui->transmitBrowse->setEnabled(true);
-            ui->transmitButton->setText(u8"开始升级");
+            if (!ui->transmitPath->text().isEmpty()) {
+                ui->transmitButton->setEnabled(true);
+                ui->directBurnButton->setEnabled(true);
+            }
+            ui->transmitButton->setText(u8"固件上传");
             return;
         }
 
@@ -370,7 +415,7 @@ void Widget::startFirmwareTransmission() {
 
     if (ymodemFileTransmit->startTransmit() == true) {
         appendLog("YMODEM传输已启动");
-        ui->transmitButton->setText(u8"取消升级");
+        ui->transmitButton->setText(u8"取消上传");
     } else {
         appendLog("错误: YMODEM传输启动失败！");
         transmitButtonStatus = false;
@@ -379,6 +424,64 @@ void Widget::startFirmwareTransmission() {
         ui->transmitButton->setText(u8"开始升级");
         QMessageBox::warning(this, u8"失败",
                              u8"固件升级失败！\n"
+                             u8"错误信息: YMODEM传输启动失败！",
+                             QMessageBox::Close);
+    }
+}
+
+void Widget::on_directBurnButton_clicked() {
+    if (directBurnButtonStatus == false) {
+        // 开始直接烧录流程：跳过upgrade命令，直接进行YMODEM传输
+        appendLog("=== 开始直接固件烧录流程 ===");
+        directBurnButtonStatus = true;
+        ui->comButton->setDisabled(true);
+        ui->transmitBrowse->setDisabled(true);
+        ui->transmitButton->setDisabled(true);
+        ui->directBurnButton->setText(u8"取消烧录");
+        ui->transmitProgress->setValue(0);
+
+        // 直接开始固件传输，不发送upgrade命令
+        startDirectFirmwareTransmission();
+    } else {
+        // 取消烧录
+        appendLog("用户取消直接烧录操作");
+        ymodemFileTransmit->stopTransmit();
+
+        directBurnButtonStatus = false;
+        ui->comButton->setEnabled(true);
+        ui->transmitBrowse->setEnabled(true);
+        ui->transmitButton->setEnabled(true);
+        ui->directBurnButton->setText(u8"固件烧录");
+    }
+}
+
+void Widget::startDirectFirmwareTransmission() {
+    appendLog("直接开始YMODEM固件传输（跳过upgrade命令）...");
+
+    // 确保串口是关闭的，让YmodemFileTransmit重新打开
+    if (serialPort->isOpen()) {
+        serialPort->close();
+        appendLog("关闭调试串口，准备启动直接YMODEM传输");
+    }
+
+    ymodemFileTransmit->setFileName(ui->transmitPath->text());
+    ymodemFileTransmit->setPortName(ui->comPort->currentText());
+    ymodemFileTransmit->setPortBaudRate(ui->comBaudRate->currentText().toInt());
+
+    appendLog(QString("准备直接发送固件文件: %1").arg(ui->transmitPath->text()));
+
+    if (ymodemFileTransmit->startTransmit() == true) {
+        appendLog("直接YMODEM传输已启动");
+        ui->directBurnButton->setText(u8"取消烧录");
+    } else {
+        appendLog("错误: 直接YMODEM传输启动失败！");
+        directBurnButtonStatus = false;
+        ui->comButton->setEnabled(true);
+        ui->transmitBrowse->setEnabled(true);
+        ui->transmitButton->setEnabled(true);
+        ui->directBurnButton->setText(u8"固件烧录");
+        QMessageBox::warning(this, u8"失败",
+                             u8"直接固件烧录失败！\n"
                              u8"错误信息: YMODEM传输启动失败！",
                              QMessageBox::Close);
     }

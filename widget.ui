@@ -195,7 +195,17 @@
            <bool>false</bool>
           </property>
           <property name="text">
-           <string>开始升级</string>
+           <string>固件上传</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="directBurnButton">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
+          <property name="text">
+           <string>固件烧录</string>
           </property>
          </widget>
         </item>
