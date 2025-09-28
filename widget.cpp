@@ -307,6 +307,8 @@ void Widget::sendUpgradeCommand() {
 
     // 首先尝试慢速发送
     sendUpgradeCommandSlow();
+    // delay for 50ms and resent sendUpgradeCommandSlow() to ensure the command is sent
+    QTimer::singleShot(50, this, [this]() { sendUpgradeCommandSlow(); });
 }
 
 void Widget::sendUpgradeCommandSlow() {
@@ -322,7 +324,21 @@ void Widget::sendUpgradeCommandSlow() {
 
         if (bytesWritten == 1) {
             totalBytesWritten++;
-            serialPort->waitForBytesWritten(100);    // 等待字符发送完成
+            // if buardrate is 921600, wait for 100ms
+            // if buardrate is 460800, wait for 50ms
+            if (ui->comBaudRate->currentText() == "921600") {
+                serialPort->waitForBytesWritten(100);    // 等待字符发送完成
+            } else if (ui->comBaudRate->currentText() == "460800") {
+                serialPort->waitForBytesWritten(30);    // 等待字符发送完成
+            } else if (ui->comBaudRate->currentText() == "230400") {
+                serialPort->waitForBytesWritten(25);    // 等待字符发送完成
+            } else if (ui->comBaudRate->currentText() == "115200") {
+                serialPort->waitForBytesWritten(10);    // 等待字符发送完成
+            } else if (ui->comBaudRate->currentText() == "57600") {
+                serialPort->waitForBytesWritten(5);    // 等待字符发送完成
+            } else {
+                serialPort->waitForBytesWritten(50);    // 等待字符发送完成
+            }
 
             // 显示当前发送的字符（用于调试）
             if (singleChar == '\r')
